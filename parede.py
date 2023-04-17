@@ -1,44 +1,40 @@
 import cv2
 import numpy as np
-import tensorflow as tf
-from tensorflow.keras.applications.mobilenet_v2 import MobileNetV2, preprocess_input
-
-# Load the pre-trained model
-model = MobileNetV2(weights='imagenet', include_top=False)
 
 # Load the image
 image_path = 'parede.png'
 image = cv2.imread(image_path)
 image = cv2.resize(image, (224, 224))
 
-# Preprocess the image
-image = preprocess_input(image)
-image = np.expand_dims(image, axis=0)
+# Convert the image to grayscale
+gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+cv2.imshow('Grayscale Image', gray)
+cv2.waitKey(5000)
 
-# Perform object detection
-predictions = model.predict(image)
+# Apply a Gaussian blur to reduce noise
+blurred = cv2.GaussianBlur(gray, (3, 3), 0)
+cv2.imshow('Blurred Image', blurred)
+cv2.waitKey(5000)
 
-# Define a threshold for hold detection
-threshold = 0.5
+# Use adaptive thresholding to create a binary image
+binary = cv2.adaptiveThreshold(
+    blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 2)
+cv2.imshow('Binary Image', binary)
+cv2.waitKey(5000)
 
-# Extract detected holds
-holds = []
+# Find contours in the binary image
+contours, _ = cv2.findContours(
+    binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-for i in range(predictions.shape[1]):
-    for j in range(predictions.shape[2]):
-        if predictions[0, i, j, 0] > threshold:
-            holds.append((i, j))
+# Filter contours based on their size
+min_area = 10  # Adjust this value based on the minimum size of the holds
+filtered_contours = [c for c in contours if cv2.contourArea(c) > min_area]
 
-# Convert the image back to the original format
-display_image = ((image[0] + 1) * 127.5).astype(np.uint8)
+# Draw detected contours on the original image
+for contour in filtered_contours:
+    x, y, w, h = cv2.boundingRect(contour)
+    cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
-# Visualize the detected holds
-for hold in holds:
-    x, y = hold
-    x *= 8  # Scale back to the original image size
-    y *= 8  # Scale back to the original image size
-    cv2.circle(display_image, (x, y), 5, (0, 255, 0), 2)
-
-cv2.imshow('Detected Holds', display_image)
-cv2.waitKey(0)
+cv2.imshow('Detected Holds', image)
+cv2.waitKey(5000)
 cv2.destroyAllWindows()
